@@ -24,11 +24,11 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True
 }
 
-# 使用更稳定的SMTP配置
-app.config['SMTP_SERVER'] = os.getenv('SMTP_SERVER', 'smtp.office365.com')  # 使用office365服务器
-app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', '587'))
-app.config['EMAIL_FROM'] = os.getenv('EMAIL_FROM', 'rbx-hnqc@outlook.com')
-app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', 'HNQC2025')
+# 使用 163 邮箱配置
+app.config['SMTP_SERVER'] = os.getenv('SMTP_SERVER', 'smtp.163.com')
+app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', '465'))
+app.config['EMAIL_FROM'] = os.getenv('EMAIL_FROM', 'rbxhnqc@163.com')
+app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', 'WYxR59QzfG5rJLn2')
 app.config['CODE_LENGTH'] = 6
 app.config['CODE_EXPIRY'] = 300  # 5分钟
 app.config['ZEABUR_URL'] = os.getenv('ZEABUR_URL', 'https://qq-verifier.zeabur.app')
@@ -79,7 +79,7 @@ keep_alive_thread = threading.Thread(target=keep_alive)
 keep_alive_thread.daemon = True
 keep_alive_thread.start()
 
-# 发送验证码邮件（带重试机制）
+# 发送验证码邮件（使用163邮箱）
 def send_verification_email(to_email, code):
     max_retries = 3
     for attempt in range(max_retries):
@@ -104,11 +104,8 @@ def send_verification_email(to_email, code):
             msg['From'] = sender_email
             msg['To'] = to_email
             
-            # 使用更稳定的连接方式
-            with smtplib.SMTP(app.config['SMTP_SERVER'], app.config['SMTP_PORT']) as server:
-                server.ehlo()  # 发送EHLO命令
-                server.starttls()  # 启动TLS加密
-                server.ehlo()  # 再次发送EHLO命令
+            # 使用 SSL 连接 163 邮箱
+            with smtplib.SMTP_SSL(app.config['SMTP_SERVER'], app.config['SMTP_PORT']) as server:
                 server.login(sender_email, password)
                 server.send_message(msg)
             logger.info(f"邮件成功发送至 {to_email}")
