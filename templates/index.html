@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[HNQC]群验证服务</title>
+    <title>QQ群验证服务</title>
     <style>
         * {
             box-sizing: border-box;
@@ -171,16 +171,24 @@
             margin-top: 5px;
             display: none;
         }
+        
+        .auto-whitelist {
+            background-color: #e8f0fe;
+            border-left: 4px solid #1a73e8;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>[HNQC]群验证服务</h1>
+            <h1>QQ群验证服务</h1>
         </header>
         
         <div class="instructions">
-            <h3>[HNQC系统]操作说明</h3>
+            <h3>操作说明</h3>
             <p>输入您的邮箱，我们将发送一个验证码。请将此验证码提供给QQ机器人进行验证。</p>
         </div>
         
@@ -188,6 +196,11 @@
             <h3>重要提示</h3>
             <p>我们已升级邮件服务，现在所有邮箱都能收到验证码邮件！</p>
             <p>如果您仍未收到邮件，请检查垃圾邮件文件夹。</p>
+        </div>
+        
+        <div class="auto-whitelist">
+            <h3>自动白名单功能</h3>
+            <p>系统会自动将您的邮箱添加到白名单，无需手动操作！</p>
         </div>
         
         <div class="section">
@@ -216,6 +229,7 @@
             <a href="/db_test">测试数据库</a>
             <a href="/send_records">查看发送记录</a>
             <a href="/check_whitelist?email=your@email.com">检查白名单</a>
+            <a href="/add_whitelist?email=your@email.com">添加白名单</a>
         </div>
     </div>
     
