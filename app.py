@@ -1,81 +1,55 @@
 import os
+import sqlite3
 import smtplib
 import random
 import time
 import logging
-import psycopg2
+import threading
+import requests
 from email.mime.text import MIMEText
 from flask import Flask, request, jsonify, render_template
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = Flask(__name__)
 
 # 配置设置
-app.config['SMTP_SERVER'] = os.getenv('SMTP_SERVER', 'smtp-mail.outlook.com')
-app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', '587'))
-app.config['EMAIL_FROM'] = os.getenv('EMAIL_FROM', 'rbx-hnqc@outlook.com')
-app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', 'HNQC2025')
+app.config['DB_FILE'] = '/data/email_verification.db'  # 持久化存储位置
+app.config['SMTP_SERVER'] = os.getenv('SMTP_SERVER', 'smtp.qiye.163.com')
+app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', '465'))
+app.config['EMAIL_FROM'] = os.getenv('EMAIL_FROM', 'admin@yourdomain.com')
+app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', 'your_password')
 app.config['CODE_LENGTH'] = 6
 app.config['CODE_EXPIRY'] = 300  # 5分钟
+app.config['ZEABUR_URL'] = os.getenv('ZEABUR_URL', 'https://qq-verifier.zeabur.app')
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
-
-# 获取数据库连接
-def get_db_connection():
-    try:
-        # 使用连接字符串
-        database_url = os.getenv('DATABASE_URL')
-        if database_url:
-            return psycopg2.connect(database_url, sslmode='require')
-        
-        # 使用单独的环境变量
-        return psycopg2.connect(
-            host=os.getenv('DB_HOST'),
-            database=os.getenv('DB_NAME'),
-            user=os.getenv('DB_USER'),
-            password=os.getenv('DB_PASSWORD'),
-            port=os.getenv('DB_PORT'),
-            sslmode='require'
-        )
-    except Exception as e:
-        logger.error(f"数据库连接失败: {str(e)}")
-        return None
 
 # 初始化数据库
 def init_db():
-    conn = get_db_connection()
-    if not conn:
-        logger.error("无法连接到数据库")
-        return
-        
     try:
-        cur = conn.cursor()
-        
-        # 创建验证码表
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS verification_codes (
-                email TEXT PRIMARY KEY,
-                code TEXT NOT NULL,
-                created_at BIGINT NOT NULL,
-                is_used BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        
-        # 创建索引
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_email ON verification_codes(email)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON verification_codes(created_at)')
-        
-        conn.commit()
+        with sqlite3.connect(app.config['DB_FILE']) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS verification_codes (
+                    email TEXT PRIMARY KEY,
+                    code TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    is_used INTEGER DEFAULT 0
+                )
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_created_at ON verification_codes(created_at)')
+            conn.commit()
         logger.info("数据库初始化完成")
     except Exception as e:
         logger.error(f"数据库初始化失败: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
 
 # 发送验证码邮件
 def send_verification_email(to_email, code):
@@ -100,9 +74,8 @@ def send_verification_email(to_email, code):
         msg['From'] = sender_email
         msg['To'] = to_email
         
-        # 添加超时设置
-        with smtplib.SMTP(app.config['SMTP_SERVER'], app.config['SMTP_PORT'], timeout=10) as server:
-            server.starttls()
+        # 使用SSL连接
+        with smtplib.SMTP_SSL(app.config['SMTP_SERVER'], app.config['SMTP_PORT'], timeout=10) as server:
             server.login(sender_email, password)
             server.send_message(msg)
         logger.info(f"邮件成功发送至 {to_email}")
@@ -114,20 +87,26 @@ def send_verification_email(to_email, code):
 # 清理过期验证码
 def clean_expired_codes():
     expired_time = time.time() - app.config['CODE_EXPIRY']
-    conn = get_db_connection()
-    if not conn:
-        return
-        
     try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM verification_codes WHERE created_at < %s OR is_used = TRUE", (expired_time,))
-        conn.commit()
+        with sqlite3.connect(app.config['DB_FILE']) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM verification_codes WHERE created_at < ? OR is_used = 1", (expired_time,))
+            conn.commit()
         logger.info("已清理过期验证码")
     except Exception as e:
         logger.error(f"清理过期验证码失败: {str(e)}")
-    finally:
-        if conn:
-            conn.close()
+
+# 自动保持应用活跃
+def keep_alive():
+    """自动保持应用活跃"""
+    while True:
+        try:
+            # 访问健康检查端点
+            response = requests.get(f"{app.config['ZEABUR_URL']}/health", timeout=10)
+            logger.info(f"Keep-alive request: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Keep-alive failed: {str(e)}")
+        time.sleep(300)  # 每5分钟执行一次
 
 # 路由：首页
 @app.route('/')
@@ -152,30 +131,18 @@ def request_code():
     code = ''.join(random.choices('0123456789', k=app.config['CODE_LENGTH']))
     
     # 保存到数据库
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
-        
     try:
-        cur = conn.cursor()
-        
-        cur.execute("""
-            INSERT INTO verification_codes (email, code, created_at, is_used)
-            VALUES (%s, %s, %s, FALSE)
-            ON CONFLICT (email) DO UPDATE SET
-                code = EXCLUDED.code,
-                created_at = EXCLUDED.created_at,
-                is_used = FALSE
-        """, (email, code, int(time.time())))
-        
-        conn.commit()
+        with sqlite3.connect(app.config['DB_FILE']) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO verification_codes (email, code, created_at, is_used)
+                VALUES (?, ?, ?, 0)
+            """, (email, code, time.time()))
+            conn.commit()
         logger.info(f"为 {email} 生成验证码: {code}")
     except Exception as e:
         logger.error(f"数据库错误: {e}")
         return jsonify({'success': False, 'error': '系统错误'}), 500
-    finally:
-        if conn:
-            conn.close()
     
     # 发送邮件
     if send_verification_email(email, code):
@@ -198,78 +165,13 @@ def verify_code():
     clean_expired_codes()
     
     # 验证验证码
-    conn = get_db_connection()
-    if not conn:
-        return jsonify({'success': False, 'error': '数据库连接失败'}), 500
-        
     try:
-        cur = conn.cursor()
-        
-        cur.execute("""
-            SELECT * FROM verification_codes 
-            WHERE email = %s AND code = %s AND is_used = FALSE
-        """, (email, code))
-        
-        row = cur.fetchone()
-        
-        if not row:
-            return jsonify({'success': False, 'error': '验证码无效或已使用'}), 400
-        
-        # 标记为已使用
-        cur.execute("UPDATE verification_codes SET is_used = TRUE WHERE email = %s", (email,))
-        conn.commit()
-        
-        logger.info(f"{email} 验证成功")
-        return jsonify({'success': True, 'message': '验证成功！您可以使用此验证码加入QQ群'})
-    except Exception as e:
-        logger.error(f"验证失败: {str(e)}")
-        return jsonify({'success': False, 'error': '系统错误'}), 500
-    finally:
-        if conn:
-            conn.close()
-
-# 调试路由：数据库测试
-@app.route('/db_test')
-def db_test():
-    """测试数据库连接"""
-    try:
-        conn = get_db_connection()
-        if conn:
-            conn.close()
-            return "数据库连接成功"
-        return "数据库连接失败"
-    except Exception as e:
-        return f"数据库错误: {str(e)}"
-
-# 调试路由：邮件测试
-@app.route('/mail_test')
-def mail_test():
-    """测试邮件发送"""
-    try:
-        success = send_verification_email("rbx-hnqc@outlook.com", "123456")
-        return "邮件发送成功" if success else "邮件发送失败"
-    except Exception as e:
-        return f"邮件错误: {str(e)}"
-
-# 调试路由：环境变量
-@app.route('/env')
-def env_info():
-    """显示环境变量"""
-    env_vars = {
-        'EMAIL_FROM': os.getenv('EMAIL_FROM'),
-        'SMTP_PASSWORD': '*******' if os.getenv('SMTP_PASSWORD') else None,
-        'SMTP_SERVER': os.getenv('SMTP_SERVER'),
-        'SMTP_PORT': os.getenv('SMTP_PORT'),
-        'DATABASE_URL': os.getenv('DATABASE_URL'),
-        'DB_HOST': os.getenv('DB_HOST'),
-        'DB_NAME': os.getenv('DB_NAME'),
-        'DB_USER': os.getenv('DB_USER'),
-        'DB_PASSWORD': '*******' if os.getenv('DB_PASSWORD') else None,
-        'DB_PORT': os.getenv('DB_PORT')
-    }
-    return jsonify(env_vars)
-
-if __name__ == '__main__':
-    init_db()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+        with sqlite3.connect(app.config['DB_FILE']) as conn:
+            cursor = conn.cursor()
+            row = cursor.execute("""
+                SELECT * FROM verification_codes 
+                WHERE email = ? AND code = ? AND is_used = 0
+            """, (email, code)).fetchone()
+            
+            if not row:
+     
