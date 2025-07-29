@@ -118,7 +118,13 @@ def add_to_sendcloud_whitelist(email):
         }
         
         response = requests.post(url, data=data)
-        result = response.json()
+        
+        # 尝试解析响应
+        try:
+            result = response.json()
+        except json.JSONDecodeError:
+            logger.error(f"添加白名单响应不是有效的JSON: {response.text}")
+            return False
         
         if result.get('result') == True:
             logger.info(f"已将 {email} 添加到 SendCloud 白名单")
@@ -376,6 +382,7 @@ def send_records():
         api_user = app.config['SENDCLOUD_API_USER']
         api_key = app.config['SENDCLOUD_API_KEY']
         
+        # 使用正确的API端点
         url = "https://api.sendcloud.net/apiv2/mail/stat/list"
         params = {
             "apiUser": api_user,
@@ -392,7 +399,7 @@ def send_records():
             result = response.json()
         except json.JSONDecodeError:
             logger.error(f"SendCloud响应不是有效的JSON: {response.text}")
-            return f"获取发送记录失败: 响应不是有效的JSON"
+            return f"获取发送记录失败: 响应不是有效的JSON，原始响应: {response.text}"
         
         if result.get('result') == True:
             records = result.get('info', {}).get('dataList', [])
@@ -424,13 +431,18 @@ def check_whitelist():
         if not email:
             return "请提供邮箱参数，例如：/check_whitelist?email=your@email.com"
         
+        # 验证邮箱格式
+        validated_email = validate_email(email)
+        if not validated_email:
+            return "无效邮箱地址"
+        
         # 尝试发送测试邮件
-        result = send_verification_email(email, "000000")
+        result = send_verification_email(validated_email, "000000")
         
         if result is True:
-            return f"邮箱 {email} 在白名单中"
+            return f"邮箱 {validated_email} 在白名单中"
         elif isinstance(result, dict) and "not in whitelist" in result.get('details', '').lower():
-            return f"邮箱 {email} 不在白名单中"
+            return f"邮箱 {validated_email} 不在白名单中"
         else:
             return f"检查失败: {result.get('details', '未知错误')}"
     except Exception as e:
