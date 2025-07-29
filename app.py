@@ -5,10 +5,12 @@ import logging
 import threading
 import requests
 import re
+import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 app = Flask(__name__)
 
@@ -101,6 +103,34 @@ def validate_email(email):
     
     return normalized_email
 
+# 添加邮箱到 SendCloud 白名单
+def add_to_sendcloud_whitelist(email):
+    """将邮箱添加到 SendCloud 白名单"""
+    try:
+        api_user = app.config['SENDCLOUD_API_USER']
+        api_key = app.config['SENDCLOUD_API_KEY']
+        
+        url = "https://api.sendcloud.net/apiv2/whitelist/add"
+        data = {
+            "apiUser": api_user,
+            "apiKey": api_key,
+            "mailAddress": email
+        }
+        
+        response = requests.post(url, data=data)
+        result = response.json()
+        
+        if result.get('result') == True:
+            logger.info(f"已将 {email} 添加到 SendCloud 白名单")
+            return True
+        else:
+            error_msg = result.get('message', '未知错误')
+            logger.error(f"添加白名单失败: {error_msg}")
+            return False
+    except Exception as e:
+        logger.error(f"添加白名单失败: {str(e)}")
+        return False
+
 # 发送验证码邮件（使用 SendCloud API）
 def send_verification_email(to_email, code):
     try:
@@ -151,7 +181,17 @@ def send_verification_email(to_email, code):
         
         # 发送请求
         response = requests.post(url, data=data)
-        result = response.json()
+        
+        # 尝试解析响应
+        try:
+            result = response.json()
+        except json.JSONDecodeError:
+            logger.error(f"SendCloud响应不是有效的JSON: {response.text}")
+            return {
+                'success': False,
+                'error': '邮件发送失败',
+                'details': 'SendCloud响应格式错误'
+            }
         
         # 检查响应
         if result.get('result') == True:
@@ -175,11 +215,39 @@ def send_verification_email(to_email, code):
                     'details': '已达到每日发送限制'
                 }
             elif "not in whitelist" in error_msg.lower():
-                return {
-                    'success': False,
-                    'error': '邮箱不在白名单',
-                    'details': '请将此邮箱添加到SendCloud白名单'
-                }
+                # 自动添加到白名单
+                if add_to_sendcloud_whitelist(validated_email):
+                    # 重试发送邮件
+                    logger.info(f"重试发送邮件至 {validated_email}")
+                    response = requests.post(url, data=data)
+                    
+                    try:
+                        result = response.json()
+                    except json.JSONDecodeError:
+                        logger.error(f"SendCloud响应不是有效的JSON: {response.text}")
+                        return {
+                            'success': False,
+                            'error': '邮件发送失败',
+                            'details': 'SendCloud响应格式错误'
+                        }
+                    
+                    if result.get('result') == True:
+                        logger.info(f"邮件成功发送至 {validated_email} (重试)")
+                        return True
+                    else:
+                        error_msg = result.get('message', '未知错误')
+                        logger.error(f"邮件发送失败 (重试): {error_msg}")
+                        return {
+                            'success': False,
+                            'error': '邮件发送失败',
+                            'details': f"重试失败: {error_msg}"
+                        }
+                else:
+                    return {
+                        'success': False,
+                        'error': '邮件发送失败',
+                        'details': '无法将邮箱添加到白名单'
+                    }
             else:
                 return {
                     'success': False,
@@ -318,9 +386,20 @@ def send_records():
         }
         
         response = requests.get(url, params=params)
-        records = response.json().get('info', {}).get('dataList', [])
         
-        return jsonify(records)
+        # 尝试解析响应
+        try:
+            result = response.json()
+        except json.JSONDecodeError:
+            logger.error(f"SendCloud响应不是有效的JSON: {response.text}")
+            return f"获取发送记录失败: 响应不是有效的JSON"
+        
+        if result.get('result') == True:
+            records = result.get('info', {}).get('dataList', [])
+            return jsonify(records)
+        else:
+            error_msg = result.get('message', '未知错误')
+            return f"获取发送记录失败: {error_msg}"
     except Exception as e:
         return f"获取发送记录失败: {str(e)}"
 
@@ -329,7 +408,8 @@ def send_records():
 def db_test():
     """测试数据库连接"""
     try:
-        db.session.execute("SELECT 1")
+        # 使用 text() 包装 SQL 语句
+        db.session.execute(text("SELECT 1"))
         return "数据库连接成功"
     except Exception as e:
         return f"数据库连接失败: {str(e)}"
@@ -350,11 +430,34 @@ def check_whitelist():
         if result is True:
             return f"邮箱 {email} 在白名单中"
         elif isinstance(result, dict) and "not in whitelist" in result.get('details', '').lower():
-            return f"邮箱 {email} 不在白名单中，请添加到SendCloud白名单"
+            return f"邮箱 {email} 不在白名单中"
         else:
             return f"检查失败: {result.get('details', '未知错误')}"
     except Exception as e:
         return f"检查失败: {str(e)}"
+
+# 添加白名单端点
+@app.route('/add_whitelist')
+def add_whitelist():
+    """手动添加邮箱到白名单"""
+    try:
+        # 获取邮箱参数
+        email = request.args.get('email', '')
+        if not email:
+            return "请提供邮箱参数，例如：/add_whitelist?email=your@email.com"
+        
+        # 验证邮箱格式
+        validated_email = validate_email(email)
+        if not validated_email:
+            return "无效邮箱地址"
+        
+        # 添加到白名单
+        if add_to_sendcloud_whitelist(validated_email):
+            return f"已将 {validated_email} 添加到白名单"
+        else:
+            return f"添加白名单失败"
+    except Exception as e:
+        return f"添加白名单失败: {str(e)}"
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
