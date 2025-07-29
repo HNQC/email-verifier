@@ -20,4 +20,12 @@ RUN mkdir /data
 EXPOSE 5000
 
 # 启动命令
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "2"]
+FROM python:3.10-slim
+LABEL "language"="python"
+LABEL "framework"="flask"
+WORKDIR /src
+COPY . .
+RUN pip install --upgrade pip && pip install flask requests
+EXPOSE 8080
+CMD ["python", "app.py"]
