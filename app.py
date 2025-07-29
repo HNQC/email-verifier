@@ -174,4 +174,66 @@ def verify_code():
             """, (email, code)).fetchone()
             
             if not row:
-     
+                return jsonify({'success': False, 'error': '验证码无效或已使用'}), 400
+            
+            # 标记为已使用
+            cursor.execute("UPDATE verification_codes SET is_used = 1 WHERE email = ?", (email,))
+            conn.commit()
+            logger.info(f"{email} 验证成功")
+            return jsonify({'success': True, 'message': '验证成功！您可以使用此验证码加入QQ群'})
+    except Exception as e:
+        logger.error(f"验证失败: {str(e)}")
+        return jsonify({'success': False, 'error': '系统错误'}), 500
+
+# 健康检查端点
+@app.route('/health')
+def health_check():
+    """健康检查端点"""
+    return "OK", 200
+
+# 数据库测试端点
+@app.route('/db_test')
+def db_test():
+    """测试数据库连接"""
+    try:
+        with sqlite3.connect(app.config['DB_FILE']) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            return "数据库连接成功"
+    except Exception as e:
+        return f"数据库连接失败: {str(e)}"
+
+# 邮件测试端点
+@app.route('/mail_test')
+def mail_test():
+    """测试邮件发送"""
+    try:
+        success = send_verification_email("test@example.com", "123456")
+        return "邮件发送成功" if success else "邮件发送失败"
+    except Exception as e:
+        return f"邮件错误: {str(e)}"
+
+# 日志查看端点
+@app.route('/logs')
+def view_logs():
+    """查看日志"""
+    try:
+        with open('app.log', 'r') as log_file:
+            logs = log_file.read()
+        return f"<pre>{logs}</pre>"
+    except Exception as e:
+        return f"无法读取日志: {str(e)}"
+
+# 启动应用
+if __name__ == '__main__':
+    # 初始化数据库
+    init_db()
+    
+    # 启动保持活跃线程
+    keep_alive_thread = threading.Thread(target=keep_alive)
+    keep_alive_thread.daemon = True
+    keep_alive_thread.start()
+    
+    # 启动Flask应用
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
