@@ -5,17 +5,14 @@
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "15mb",
-        "includeFiles": ["templates/**", "requirements.txt"]
+        "includeFiles": ["templates/**", "requirements.txt", "runtime.txt"]
       }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "app.py",
-      "headers": {
-        "Cache-Control": "public, max-age=3600"
-      }
+      "dest": "app.py"
     }
   ]
 }
