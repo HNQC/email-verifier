@@ -27,13 +27,13 @@ logger = logging.getLogger(__name__)
 # 获取数据库连接
 def get_db_connection():
     try:
-        # 尝试使用连接字符串
+        # 使用连接字符串
         database_url = os.getenv('DATABASE_URL')
         if database_url:
             return psycopg2.connect(database_url, sslmode='require')
         
         # 使用单独的环境变量
-        conn = psycopg2.connect(
+        return psycopg2.connect(
             host=os.getenv('DB_HOST'),
             database=os.getenv('DB_NAME'),
             user=os.getenv('DB_USER'),
@@ -41,7 +41,6 @@ def get_db_connection():
             port=os.getenv('DB_PORT'),
             sslmode='require'
         )
-        return conn
     except Exception as e:
         logger.error(f"数据库连接失败: {str(e)}")
         return None
@@ -101,7 +100,8 @@ def send_verification_email(to_email, code):
         msg['From'] = sender_email
         msg['To'] = to_email
         
-        with smtplib.SMTP(app.config['SMTP_SERVER'], app.config['SMTP_PORT']) as server:
+        # 添加超时设置
+        with smtplib.SMTP(app.config['SMTP_SERVER'], app.config['SMTP_PORT'], timeout=10) as server:
             server.starttls()
             server.login(sender_email, password)
             server.send_message(msg)
@@ -228,39 +228,46 @@ def verify_code():
         if conn:
             conn.close()
 
-# 调试路由：显示文件路径
-@app.route('/debug')
-def debug():
-    """调试信息页面"""
-    # 获取当前工作目录
-    cwd = os.getcwd()
-    
-    # 获取模板目录路径
-    template_dir = os.path.join(cwd, 'templates')
-    
-    # 检查模板文件是否存在
-    template_path = os.path.join(template_dir, 'index.html')
-    template_exists = os.path.exists(template_path)
-    
-    # 列出所有文件
-    all_files = []
-    for root, dirs, files in os.walk(cwd):
-        for file in files:
-            all_files.append(os.path.join(root, file))
-    
-    # 创建调试信息页面
-    return f"""
-    <h1>调试信息</h1>
-    <p>当前工作目录: {cwd}</p>
-    <p>模板目录: {template_dir}</p>
-    <p>模板文件路径: {template_path}</p>
-    <p>模板文件是否存在: {template_exists}</p>
-    
-    <h2>项目文件列表</h2>
-    <ul>
-        {"".join(f"<li>{file}</li>" for file in all_files)}
-    </ul>
-    """
+# 调试路由：数据库测试
+@app.route('/db_test')
+def db_test():
+    """测试数据库连接"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            conn.close()
+            return "数据库连接成功"
+        return "数据库连接失败"
+    except Exception as e:
+        return f"数据库错误: {str(e)}"
+
+# 调试路由：邮件测试
+@app.route('/mail_test')
+def mail_test():
+    """测试邮件发送"""
+    try:
+        success = send_verification_email("rbx-hnqc@outlook.com", "123456")
+        return "邮件发送成功" if success else "邮件发送失败"
+    except Exception as e:
+        return f"邮件错误: {str(e)}"
+
+# 调试路由：环境变量
+@app.route('/env')
+def env_info():
+    """显示环境变量"""
+    env_vars = {
+        'EMAIL_FROM': os.getenv('EMAIL_FROM'),
+        'SMTP_PASSWORD': '*******' if os.getenv('SMTP_PASSWORD') else None,
+        'SMTP_SERVER': os.getenv('SMTP_SERVER'),
+        'SMTP_PORT': os.getenv('SMTP_PORT'),
+        'DATABASE_URL': os.getenv('DATABASE_URL'),
+        'DB_HOST': os.getenv('DB_HOST'),
+        'DB_NAME': os.getenv('DB_NAME'),
+        'DB_USER': os.getenv('DB_USER'),
+        'DB_PASSWORD': '*******' if os.getenv('DB_PASSWORD') else None,
+        'DB_PORT': os.getenv('DB_PORT')
+    }
+    return jsonify(env_vars)
 
 if __name__ == '__main__':
     init_db()
