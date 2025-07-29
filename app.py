@@ -39,13 +39,12 @@ logger = logging.getLogger(__name__)
 # 初始化数据库
 db = SQLAlchemy(app)
 
-# 验证码数据模型
+# 验证码数据模型（简化版）
 class VerificationCode(db.Model):
     __tablename__ = "verification_codes"
     email = db.Column(db.String(128), primary_key=True)
     code = db.Column(db.String(16), nullable=False)
     created_at = db.Column(db.Float, nullable=False)
-    is_used = db.Column(db.Boolean, default=False)
 
 # 创建数据库表
 with app.app_context():
@@ -89,6 +88,7 @@ def send_verification_email(to_email, code):
                 <p>您请求的验证码是：<strong>{code}</strong></p>
                 <p>请在申请加入QQ群时在「入群理由」中填写此验证码。</p>
                 <p>提示：该验证码5分钟内有效。</p>
+                <p>QQ机器人会自动验证您的验证码。</p>
             </body>
         </html>
         """
@@ -124,10 +124,9 @@ def send_verification_email(to_email, code):
 def clean_expired_codes():
     expired_time = time.time() - app.config['CODE_EXPIRY']
     try:
-        # 删除过期或已使用的验证码
+        # 删除过期验证码
         VerificationCode.query.filter(
-            (VerificationCode.created_at < expired_time) | 
-            (VerificationCode.is_used == True)
+            VerificationCode.created_at < expired_time
         ).delete()
         db.session.commit()
         logger.info("已清理过期验证码")
@@ -160,6 +159,9 @@ def request_code():
     if not email or '@' not in email:
         return jsonify({'success': False, 'error': '无效的邮箱地址'}), 400
     
+    # 清理过期验证码
+    clean_expired_codes()
+    
     # 生成随机验证码
     code = ''.join(random.choices('0123456789', k=app.config['CODE_LENGTH']))
     
@@ -170,13 +172,11 @@ def request_code():
         if existing_code:
             existing_code.code = code
             existing_code.created_at = time.time()
-            existing_code.is_used = False
         else:
             new_code = VerificationCode(
                 email=email,
                 code=code,
-                created_at=time.time(),
-                is_used=False
+                created_at=time.time()
             )
             db.session.add(new_code)
         
@@ -189,45 +189,13 @@ def request_code():
     
     # 发送邮件
     if send_verification_email(email, code):
-        return jsonify({'success': True, 'message': '验证码已发送'})
+        return jsonify({
+            'success': True,
+            'message': '验证码已发送',
+            'instructions': '请将验证码提供给QQ机器人进行验证'
+        })
     else:
         return jsonify({'success': False, 'error': '邮件发送失败'}), 500
-
-# 路由：验证验证码
-@app.route('/verify_code', methods=['POST'])
-def verify_code():
-    # 检查请求是否为JSON格式
-    if not request.is_json:
-        return jsonify({'success': False, 'error': '请求必须使用 application/json Content-Type'}), 400
-    
-    data = request.get_json()
-    email = data.get('email', '').strip()
-    code = data.get('code', '').strip()
-    
-    # 清理过期验证码
-    clean_expired_codes()
-    
-    # 验证验证码
-    try:
-        verification_code = VerificationCode.query.filter_by(
-            email=email,
-            code=code,
-            is_used=False
-        ).first()
-        
-        if not verification_code:
-            return jsonify({'success': False, 'error': '验证码无效或已使用'}), 400
-        
-        # 标记为已使用
-        verification_code.is_used = True
-        db.session.commit()
-        
-        logger.info(f"{email} 验证成功")
-        return jsonify({'success': True, 'message': '验证成功！您可以使用此验证码加入QQ群'})
-    except SQLAlchemyError as e:
-        logger.error(f"验证失败: {str(e)}")
-        db.session.rollback()
-        return jsonify({'success': False, 'error': '系统错误'}), 500
 
 # 数据库测试端点
 @app.route('/db_test')
