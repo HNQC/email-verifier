@@ -4,31 +4,24 @@ import time
 import logging
 import threading
 import requests
-import smtplib
-from email.mime.text import MIMEText
 from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 
-# Zeabur 平台自动注入 MySQL 环境变量
+# 数据库配置
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     f"mysql+pymysql://{os.environ['MYSQL_USERNAME']}:{os.environ['MYSQL_PASSWORD']}"
     f"@{os.environ['MYSQL_HOST']}:{os.environ['MYSQL_PORT']}/{os.environ['MYSQL_DATABASE']}"
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 5,
-    'pool_recycle': 300,
-    'pool_pre_ping': True
-}
 
-# 使用 163 邮箱配置
-app.config['SMTP_SERVER'] = os.getenv('SMTP_SERVER', 'smtp.163.com')
-app.config['SMTP_PORT'] = int(os.getenv('SMTP_PORT', '465'))
-app.config['EMAIL_FROM'] = os.getenv('EMAIL_FROM', 'rbxhnqc@163.com')
-app.config['SMTP_PASSWORD'] = os.getenv('SMTP_PASSWORD', 'WYxR59QzfG5rJLn2')
+# SendCloud 配置
+app.config['SENDCLOUD_API_USER'] = os.getenv('SENDCLOUD_API_USER', 'sc_yg739l_test_N8nase')
+app.config['SENDCLOUD_API_KEY'] = os.getenv('SENDCLOUD_API_KEY', 'e0ca44d9578a1db2b71b9ca2198daf2e')
+app.config['SENDCLOUD_FROM_EMAIL'] = os.getenv('SENDCLOUD_FROM_EMAIL', 'no-reply@sendcloud.com')
+app.config['SENDCLOUD_FROM_NAME'] = os.getenv('SENDCLOUD_FROM_NAME', 'QQ群验证服务')
 app.config['CODE_LENGTH'] = 6
 app.config['CODE_EXPIRY'] = 300  # 5分钟
 app.config['ZEABUR_URL'] = os.getenv('ZEABUR_URL', 'https://qq-verifier.zeabur.app')
@@ -79,46 +72,53 @@ keep_alive_thread = threading.Thread(target=keep_alive)
 keep_alive_thread.daemon = True
 keep_alive_thread.start()
 
-# 发送验证码邮件（使用163邮箱）
+# 发送验证码邮件（使用 SendCloud API）
 def send_verification_email(to_email, code):
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            sender_email = app.config['EMAIL_FROM']
-            password = app.config['SMTP_PASSWORD']
-            
-            subject = "您的QQ群验证码"
-            body = f"""
-            <html>
-                <body>
-                    <h2>QQ群验证信息</h2>
-                    <p>您请求的验证码是：<strong>{code}</strong></p>
-                    <p>请在申请加入QQ群时在「入群理由」中填写此验证码。</p>
-                    <p>提示：该验证码5分钟内有效。</p>
-                </body>
-            </html>
-            """
-            
-            msg = MIMEText(body, 'html')
-            msg['Subject'] = subject
-            msg['From'] = sender_email
-            msg['To'] = to_email
-            
-            # 使用 SSL 连接 163 邮箱
-            with smtplib.SMTP_SSL(app.config['SMTP_SERVER'], app.config['SMTP_PORT']) as server:
-                server.login(sender_email, password)
-                server.send_message(msg)
+    try:
+        # SendCloud API 配置
+        api_user = app.config['SENDCLOUD_API_USER']
+        api_key = app.config['SENDCLOUD_API_KEY']
+        from_email = app.config['SENDCLOUD_FROM_EMAIL']
+        from_name = app.config['SENDCLOUD_FROM_NAME']
+        
+        subject = "您的QQ群验证码"
+        html_content = f"""
+        <html>
+            <body>
+                <h2>QQ群验证信息</h2>
+                <p>您请求的验证码是：<strong>{code}</strong></p>
+                <p>请在申请加入QQ群时在「入群理由」中填写此验证码。</p>
+                <p>提示：该验证码5分钟内有效。</p>
+            </body>
+        </html>
+        """
+        
+        # 构建 API 请求
+        url = "https://api.sendcloud.net/apiv2/mail/send"
+        data = {
+            "apiUser": api_user,
+            "apiKey": api_key,
+            "from": f"{from_name} <{from_email}>",
+            "to": to_email,
+            "subject": subject,
+            "html": html_content,
+            "respEmailId": "true"
+        }
+        
+        # 发送请求
+        response = requests.post(url, data=data)
+        result = response.json()
+        
+        # 检查响应
+        if result.get('result') == True:
             logger.info(f"邮件成功发送至 {to_email}")
             return True
-        except (smtplib.SMTPServerDisconnected, ConnectionResetError) as e:
-            logger.warning(f"邮件发送中断 (尝试 {attempt+1}/{max_retries}): {str(e)}")
-            time.sleep(2)  # 等待2秒后重试
-        except Exception as e:
-            logger.error(f"发送邮件失败: {str(e)}")
+        else:
+            logger.error(f"邮件发送失败: {result.get('message', '未知错误')}")
             return False
-    
-    logger.error(f"邮件发送失败，重试{max_retries}次后仍不成功")
-    return False
+    except Exception as e:
+        logger.error(f"发送邮件失败: {str(e)}")
+        return False
 
 # 清理过期验证码
 def clean_expired_codes():
