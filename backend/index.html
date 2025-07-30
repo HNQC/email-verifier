@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QQ群验证服务</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        input[type="email"], 
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        
+        .button:hover {
+            background-color: #1669d6;
+        }
+        
+        .instructions {
+            background-color: #e8f0fe;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-left: 4px solid #1a73e8;
+        }
+        
+        .instructions h3 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        
+        .result {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .success {
+            background-color: #e6f4ea;
+            border-left: 4px solid #34a853;
+        }
+        
+        .error {
+            background-color: #fce8e6;
+            border-left: 4px solid #ea4335;
+        }
+        
+        .how-to-join {
+            background-color: #f1f8e9;
+            border-left: 4px solid #0f9d58;
+            padding: 15px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QQ群验证服务</h1>
+        
+        <div class="instructions">
+            <h3>操作说明</h3>
+            <p>输入您的邮箱，我们将发送一个验证码。请将此验证码填写到QQ群的入群理由中，即可通过验证加入QQ群。</p>
+        </div>
+        
+        <div class="section">
+            <h2>获取验证码</h2>
+            <div class="form-group">
+                <label for="email">您的邮箱：</label>
+                <input type="email" id="email" placeholder="example@email.com" required>
+            </div>
+            <button id="requestBtn" class="button">发送验证码</button>
+            <div id="requestResult" class="result"></div>
+        </div>
+        
+        <div id="verifySection" class="section" style="display: none;">
+            <h2>验证您的验证码</h2>
+            <div class="form-group">
+                <label for="code">验证码：</label>
+                <input type="text" id="code" placeholder="请输入6位数字" maxlength="6">
+            </div>
+            <button id="verifyBtn" class="button">验证并加入QQ群</button>
+            <div id="verifyResult" class="result"></div>
+        </div>
+        
+        <div class="how-to-join">
+            <h3>如何加入QQ群？</h3>
+            <ol>
+                <li>获取验证码后，申请加入QQ群</li>
+                <li>在入群理由中输入 <strong>邮箱+验证码</strong></li>
+                <li>例如: your_email@example.com 123456</li>
+                <li>管理员验证后会批准您的入群请求</li>
+            </ol>
+        </div>
+        
+        <p style="text-align: center; margin-top: 30px;">
+            <a href="/test">系统测试页面</a>
+        </p>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const emailInput = document.getElementById('email');
+            const codeInput = document.getElementById('code');
+            const requestBtn = document.getElementById('requestBtn');
+            const verifyBtn = document.getElementById('verifyBtn');
+            const requestResult = document.getElementById('requestResult');
+            const verifyResult = document.getElementById('verifyResult');
+            const verifySection = document.getElementById('verifySection');
+            
+            // 请求验证码
+            requestBtn.addEventListener('click', async function() {
+                const email = emailInput.value.trim();
+                
+                if (!email) {
+                    showResult(requestResult, '请输入邮箱地址', 'error');
+                    return;
+                }
+                
+                if (!validateEmail(email)) {
+                    showResult(requestResult, '邮箱格式不正确', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/request_code', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showResult(requestResult, '验证码已发送至您的邮箱', 'success');
+                        verifySection.style.display = 'block';
+                    } else {
+                        showResult(requestResult, `发送失败: ${result.error || '未知错误'}`, 'error');
+                    }
+                } catch (error) {
+                    showResult(requestResult, '网络请求失败，请重试', 'error');
+                    console.error('请求失败:', error);
+                }
+            });
+            
+            // 验证验证码
+            verifyBtn.addEventListener('click', async function() {
+                const email = emailInput.value.trim();
+                const code = codeInput.value.trim();
+                
+                if (!email || !code) {
+                    showResult(verifyResult, '请输入邮箱和验证码', 'error');
+                    return;
+                }
+                
+                if (code.length !== 6 || !/^\d+$/.test(code)) {
+                    showResult(verifyResult, '验证码必须是6位数字', 'error');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/verify_code', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, code })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showResult(verifyResult, result.message, 'success');
+                    } else {
+                        showResult(verifyResult, `验证失败: ${result.error || '未知错误'}`, 'error');
+                    }
+                } catch (error) {
+                    showResult(verifyResult, '网络请求失败，请重试', 'error');
+                    console.error('验证失败:', error);
+                }
+            });
+            
+            // 邮箱格式验证
+            function validateEmail(email) {
+                const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return re.test(email);
+            }
+            
+            // 显示结果
+            function showResult(element, message, type) {
+                element.textContent = message;
+                element.className = `result ${type}`;
+                element.style.display = 'block';
+                
+                // 自动隐藏
+                setTimeout(() => {
+                    element.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
