@@ -9,7 +9,7 @@ DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
     'password': '63EN4QU5r8euX1Ot0KziH9x2Mpf7ATlY',  # 替换为你的MySQL密码
-    'database': 'hnqc_verification'
+    'database': 'zeabur'
 }
 
 # 创建数据库连接
