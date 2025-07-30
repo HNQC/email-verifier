@@ -9,22 +9,15 @@ const app = express();
 app.use(bodyParser.json());
 
 // 强校验关键环境变量
-['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE', 'EMAIL_USER', 'EMAIL_PASS'].forEach(env => {
+['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE', 
+ 'EMAIL_USER', 'EMAIL_PASS'].forEach(env => {
   if (!process.env[env]) {
     console.error(`环境变量${env}未配置，服务无法启动！`);
     process.exit(1);
   }
 });
-// 首页根路由，确保 GET / 返回 200 可以被健康检查和外部快速响应
-app.get('/', (req, res) => {
-  res.status(200).send('服务已启动：qq-email-verifier v1.0');
-});
-// 健康检查接口
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
 
-// MySQL连接池配置
+// MySQL 连接池
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST,
   user: process.env.MYSQL_USER,
@@ -35,7 +28,7 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// 初始化表
+// 创建表
 async function createTable() {
   try {
     await pool.query(`
@@ -47,21 +40,23 @@ async function createTable() {
         is_used BOOLEAN DEFAULT false
       )
     `);
-    console.log('MySQL表创建成功');
+    console.log('数据库表创建成功');
   } catch (err) {
-    console.error('MySQL表创建失败:', err);
+    console.error('数据库表创建失败:', err);
     process.exit(1);
   }
 }
 
-// 邮件发送配置
+createTable();
+
+// SendCloud 邮件配置
 const transporter = nodemailer.createTransport({
-  host: 'smtp.forwardemail.net',
+  host: 'smtp.sendcloud.net',
   port: 465,
   secure: true,
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: process.env.EMAIL_USER, // HNQC2025
+    pass: process.env.EMAIL_PASS  // 97b07234f8299cbc80c22768016a8cef
   }
 });
 
@@ -85,9 +80,9 @@ app.post('/send-code', async (req, res) => {
 
     // 发送邮件
     await transporter.sendMail({
-      from: `"[HNQC]验证码服务" <verify@hnqc.dpdns.org>`,
+      from: `"QQ群验证服务" <verify@hnqc.dpdns.org>`,
       to: email,
-      subject: '[HNQC]您的QQ群验证码',
+      subject: '您的QQ群验证码',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #1a73e8;">QQ群验证信息</h2>
@@ -100,10 +95,6 @@ app.post('/send-code', async (req, res) => {
           <p>请在申请加入QQ群时在「入群理由」中填写此验证码。</p>
           <p>提示：该验证码5分钟内有效。</p>
           <p>QQ机器人会自动验证您的验证码。</p>
-          <p style="font-size: 12px; color: #666;">
-            如果您不希望再收到此类邮件，
-            <a href="https://hnqc.dpdns.org/unsubscribe?email=${email}">点击退订</a>
-          </p>
         </div>
       `
     });
@@ -111,11 +102,11 @@ app.post('/send-code', async (req, res) => {
     res.json({ success: true, message: '验证码已发送' });
   } catch (error) {
     console.error('发送验证码失败:', error);
-    res.status(500).json({ error: '发送验证码失败', detail: error.message || error });
+    res.status(500).json({ error: '发送验证码失败' });
   }
 });
 
-// 验证接口
+// 验证验证码
 app.post('/verify-code', async (req, res) => {
   const { email, code } = req.body;
   
@@ -128,7 +119,7 @@ app.post('/verify-code', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT * FROM verification_codes 
        WHERE email = ? AND code = ? 
-       AND created_at > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+       AND created_at > NOW() - INTERVAL 5 MINUTE
        AND is_used = false`,
       [email, code]
     );
@@ -146,29 +137,23 @@ app.post('/verify-code', async (req, res) => {
     res.json({ success: true, message: '验证成功' });
   } catch (error) {
     console.error('验证失败:', error);
-    res.status(500).json({ error: '验证失败', detail: error.message || error });
+    res.status(500).json({ error: '验证失败' });
   }
 });
 
-// 定时清理验证码
+// 清理过期验证码
 setInterval(async () => {
   try {
-    await pool.query("DELETE FROM verification_codes WHERE created_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)");
+    await pool.query(
+      "DELETE FROM verification_codes WHERE created_at < NOW() - INTERVAL 10 MINUTE"
+    );
     console.log('已清理过期验证码');
   } catch (error) {
     console.error('清理验证码失败:', error);
   }
 }, 10 * 60 * 1000); // 每10分钟清理一次
 
-// 启动服务
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`后端服务运行在端口 ${PORT}`);
-  try {
-    await createTable();
-    console.log('服务初始化完成');
-  } catch (error) {
-    console.error('服务初始化失败:', error);
-    process.exit(1);
-  }
 });
