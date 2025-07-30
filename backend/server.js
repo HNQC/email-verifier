@@ -15,7 +15,10 @@ app.use(bodyParser.json());
     process.exit(1);
   }
 });
-
+// 首页根路由，确保 GET / 返回 200 可以被健康检查和外部快速响应
+app.get('/', (req, res) => {
+  res.status(200).send('服务已启动：qq-email-verifier v1.0');
+});
 // 健康检查接口
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
