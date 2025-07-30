@@ -6,7 +6,7 @@ from qqbot.command import MessageCommand
 
 # 数据库配置（与后端服务一致）
 DB_CONFIG = {
-    'host': 'localhost',
+    'host': 'sjc1.clusters.zeabur.com',
     'user': 'root',
     'password': '63EN4QU5r8euX1Ot0KziH9x2Mpf7ATlY',  # 替换为你的MySQL密码
     'database': 'zeabur'
