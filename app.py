@@ -110,6 +110,7 @@ def add_to_sendcloud_whitelist(email):
         api_user = app.config['SENDCLOUD_API_USER']
         api_key = app.config['SENDCLOUD_API_KEY']
         
+        # 正确的白名单添加端点
         url = "https://api.sendcloud.net/apiv2/whitelist/add"
         data = {
             "apiUser": api_user,
@@ -373,7 +374,7 @@ def mail_test():
     except Exception as e:
         return f"邮件错误: {str(e)}"
 
-# 发送记录端点
+# 发送记录端点（使用正确的API端点）
 @app.route('/send_records')
 def send_records():
     """查看发送记录"""
@@ -383,12 +384,11 @@ def send_records():
         api_key = app.config['SENDCLOUD_API_KEY']
         
         # 使用正确的API端点
-        url = "https://api.sendcloud.net/apiv2/mail/stat/list"
+        url = "https://api.sendcloud.net/apiv2/report/list"
         params = {
             "apiUser": api_user,
             "apiKey": api_key,
-            "startDate": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"),
-            "endDate": datetime.now().strftime("%Y-%m-%d"),
+            "days": 7,  # 获取最近7天的记录
             "limit": 100
         }
         
