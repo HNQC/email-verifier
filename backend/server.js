@@ -8,13 +8,25 @@ const { Pool } = require('pg');
 const app = express();
 app.use(bodyParser.json());
 
-// 数据库配置
+// 环境变量强校验
+['DATABASE_URL', 'EMAIL_USER', 'EMAIL_PASS'].forEach(env => {
+  if (!process.env[env]) {
+    console.error(`环境变量${env}未配置，服务无法启动！`);
+    process.exit(1);
+  }
+});
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// 创建验证码表
+// 健康检查接口
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+// 初始化数据库表
 async function createTable() {
   try {
     await pool.query(`
@@ -29,6 +41,7 @@ async function createTable() {
     console.log('数据库表创建成功');
   } catch (err) {
     console.error('数据库表创建失败:', err);
+    process.exit(1);
   }
 }
 
@@ -45,7 +58,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// 发送验证码
+// 发送验证码接口
 app.post('/send-code', async (req, res) => {
   const { email } = req.body;
   
@@ -65,13 +78,13 @@ app.post('/send-code', async (req, res) => {
 
     // 发送邮件
     await transporter.sendMail({
-      from: `"[HNQC]验证码服务" <verify@hnqc.dpdns.org>`,
+      from: `"验证码服务" <verify@hnqc.dpdns.org>`,
       to: email,
-      subject: '[HNQC]您的QQ群验证码',
+      subject: '您的QQ群验证码',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #1a73e8;">QQ群验证信息</h2>
-          <p>[HNQC]您请求的验证码是：</p>
+          <p>您请求的验证码是：</p>
           <div style="background: #f8f9fa; border: 1px dashed #dadce0; 
               padding: 15px; text-align: center; margin: 20px 0; 
               font-size: 24px; font-weight: bold; color: #1a73e8;">
@@ -79,11 +92,7 @@ app.post('/send-code', async (req, res) => {
           </div>
           <p>请在申请加入QQ群时在「入群理由」中填写此验证码。</p>
           <p>提示：该验证码5分钟内有效。</p>
-          <p>[HNQC]QQ机器人会自动验证您的验证码。</p>
-          <p style="font-size: 12px; color: #666;">
-            如果您不希望再收到此类邮件，
-            <a href="https://hnqc.dpdns.org/unsubscribe?email=${email}">点击退订</a>
-          </p>
+          <p>QQ机器人会自动验证您的验证码。</p>
         </div>
       `
     });
@@ -95,7 +104,7 @@ app.post('/send-code', async (req, res) => {
   }
 });
 
-// 验证验证码 (供QQ机器人调用)
+// 验证验证码接口
 app.post('/verify-code', async (req, res) => {
   const { email, code } = req.body;
   
@@ -130,7 +139,7 @@ app.post('/verify-code', async (req, res) => {
   }
 });
 
-// 清理过期验证码
+// 定时清理过期验证码
 setInterval(async () => {
   try {
     await pool.query(
