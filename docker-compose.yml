@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:password@db:5432/verification
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - PORT=3000
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    environment:
+      - REACT_APP_API_URL=http://backend:3000
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=verification
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  qqbot:
+    build: ./qq-bot
+    environment:
+      - QQ_APP_ID=${QQ_APP_ID}
+      - QQ_BOT_TOKEN=${QQ_BOT_TOKEN}
+      - BACKEND_URL=http://backend:3000
+
+volumes:
+  db-data:
