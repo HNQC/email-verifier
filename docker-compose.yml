@@ -2,11 +2,12 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgres://postgres:password@db:5432/verification
+      - DATABASE_URL=${DATABASE_URL}
       - EMAIL_USER=${EMAIL_USER}
       - EMAIL_PASS=${EMAIL_PASS}
       - PORT=3000
@@ -14,7 +15,8 @@ services:
       - db
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
     ports:
       - "80:80"
     environment:
@@ -30,7 +32,8 @@ services:
       - db-data:/var/lib/postgresql/data
 
   qqbot:
-    build: ./qq-bot
+    build: 
+      context: ./qq-bot
     environment:
       - QQ_APP_ID=${QQ_APP_ID}
       - QQ_BOT_TOKEN=${QQ_BOT_TOKEN}
