@@ -25,7 +25,7 @@ function App() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('[HNQC]验证码已发送到您的邮箱，请查收并填写到QQ入群申请中');
+        setMessage('验证码已发送到您的邮箱，请查收并填写到QQ入群申请中');
       } else {
         setMessage(data.error || '发送验证码失败');
       }
@@ -41,7 +41,7 @@ function App() {
       <div className="card">
         <h1>QQ群验证服务</h1>
         
-        {message && <div className="message">{message}</div>}
+        {message && <div className={`message ${message.includes('成功') ? 'success' : 'error'}`}>{message}</div>}
         
         <div className="form-group">
           <label htmlFor="email">您的邮箱：</label>
