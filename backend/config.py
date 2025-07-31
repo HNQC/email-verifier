@@ -1,4 +1,3 @@
-# 配置信息
 SENDCLOUD_API_USER = 'HNQC2025'
 SENDCLOUD_API_KEY = '09ea3daff4c5698556dfa85bc7471892'
 FROM_DOMAIN = 'hnqc.dpdns.org'
@@ -27,4 +26,3 @@ EMAIL_TEMPLATE = """
     </div>
 </body>
 </html>
-"""
