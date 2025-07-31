@@ -3,312 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HNQC | Q群验证</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>HNQC | Q群验证系统</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         body {
-            font-family: 'Inter', 'SF Pro Display', sans-serif;
-            background: #000;
+            background-color: #0a0a15;
             color: #fff;
             height: 100vh;
-            overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
+            overflow: hidden;
         }
         
-        #particles-js {
-            position: absolute;
-            top: 0;
-            left: 0;
+        .container {
             width: 100%;
-            height: 100%;
-            z-index: 1;
+            max-width: 500px;
+            padding: 20px;
         }
         
         .card {
-            background: rgba(10, 10, 20, 0.8);
-            border: 1px solid rgba(80, 80, 150, 0.3);
-            border-radius: 16px;
-            box-shadow: 0 12px 40px rgba(0, 60, 120, 0.3);
+            background: rgba(15, 15, 30, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
             padding: 40px;
-            max-width: 480px;
-            width: 90%;
-            z-index: 2;
-            backdrop-filter: blur(16px);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, #0088ff, #00ccff);
-        }
-        
-        .card-header {
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 0 30px rgba(0, 100, 255, 0.3);
             text-align: center;
-            margin-bottom: 32px;
         }
         
-        .card-header h1 {
-            font-size: 32px;
-            font-weight: 700;
-            background: linear-gradient(90deg, #00aaff, #ffffff);
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            color: transparent;
+            background: linear-gradient(45deg, #0099ff, #6600ff);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
+            background-clip: text;
         }
         
-        .card-header p {
-            color: #ccc;
-            font-size: 16px;
-            line-height: 1.5;
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            font-weight: 400;
+            color: #e0e0ff;
+        }
+        
+        .subtitle {
+            color: #a0a0c0;
+            margin-bottom: 30px;
+            font-size: 1rem;
         }
         
         .form-group {
-            margin-bottom: 24px;
+            margin-bottom: 25px;
+            text-align: left;
         }
         
-        .form-group label {
+        label {
             display: block;
             margin-bottom: 8px;
-            color: #ddd;
-            font-weight: 500;
+            color: #bbb;
+            font-size: 0.95rem;
         }
         
-        .form-control {
+        input[type="email"] {
             width: 100%;
-            padding: 16px;
-            border: 1px solid rgba(100, 120, 200, 0.3);
-            border-radius: 8px;
-            background: rgba(0, 10, 30, 0.5);
+            padding: 14px 15px;
+            background: rgba(25, 25, 45, 0.7);
+            border: 1px solid rgba(42, 148, 224, 0.3);
+            border-radius: 10px;
             color: #fff;
-            font-size: 16px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        input[type="email"]:focus {
             outline: none;
-            transition: all 0.3s ease;
+            border-color: #0099ff;
+            box-shadow: 0 0 10px rgba(0, 153, 255, 0.5);
+            background: rgba(255, 255, 255, 0.1);
         }
         
-        .form-control:focus {
-            border-color: #00aaff;
-            box-shadow: 0 0 0 3px rgba(0, 170, 255, 0.25);
-        }
-        
-        .btn {
+        button {
             width: 100%;
-            padding: 16px;
+            padding: 15px;
+            background: linear-gradient(45deg, #0066ff, #6600ff);
             border: none;
-            border-radius: 8px;
-            background: linear-gradient(45deg, #0044cc, #0088ff);
+            border-radius: 10px;
             color: #fff;
-            font-size: 18px;
-            font-weight: 600;
+            font-size: 1.1rem;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            position: relative;
-            overflow: hidden;
+            transition: all 0.3s;
+            margin-top: 10px;
         }
         
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0, 100, 255, 0.4);
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 102, 255, 0.4);
         }
         
-        .btn::before {
-            content: '';
-            position: absolute;
+        .notification {
+            display: none;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 1rem;
+        }
+        
+        .success {
+            background: rgba(0, 200, 83, 0.2);
+            border: 1px solid rgba(0, 200, 83, 0.5);
+        }
+        
+        .error {
+            background: rgba(255, 87, 97, 0.2);
+            border: 1px solid rgba(255, 87, 97, 0.5);
+        }
+        
+        .info {
+            margin-top: 25px;
+            font-size: 0.85rem;
+            color: #8888bb;
+            line-height: 1.5;
+        }
+        
+        .background-pattern {
+            position: fixed;
             top: 0;
-            left: -100%;
+            left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: all 0.6s ease;
+            z-index: -1;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(40, 10, 80, 0.2) 0%, transparent 40%),
+                radial-gradient(circle at 90% 60%, rgba(20, 40, 120, 0.2) 0%, transparent 40%),
+                linear-gradient(45deg, #0a0a15, #151530);
+            opacity: 0.7;
         }
         
-        .btn:hover::before {
-            left: 100%;
-        }
-        
-        #message {
-            text-align: center;
-            margin-top: 24px;
-            color: #ff5555;
-            font-size: 14px;
-            min-height: 20px;
-        }
-        
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
             .card {
                 padding: 30px 20px;
             }
-            
-            .card-header h1 {
-                font-size: 28px;
+            .logo {
+                font-size: 2.5rem;
+            }
+            h1 {
+                font-size: 1.5rem;
             }
         }
     </style>
 </head>
 <body>
-    <div id="particles-js"></div>
+    <div class="background-pattern"></div>
     
-    <div class="card">
-        <div class="card-header">
-            <h1>HNQC 验证系统</h1>
-            <p>请输入您的邮箱获取验证码</p>
+    <div class="container">
+        <div class="card">
+            <div class="logo">HNQC</div>
+            <h1>星尘验证系统</h1>
+            <p class="subtitle">输入邮箱获取验证码</p>
+            
+            <div class="form-group">
+                <label for="email">电子邮箱</label>
+                <input type="email" id="email" placeholder="your@email.com" autocomplete="off">
+            </div>
+            
+            <button id="sendBtn">发送验证码</button>
+            
+            <div id="notification" class="notification"></div>
+            
+            <div class="info">
+                验证码将发送至您的邮箱，请在申请加入群组时使用该验证码。<br>
+                验证码有效期为10分钟，请尽快使用。
+            </div>
         </div>
-        
-        <div class="form-group">
-            <label for="email">邮箱</label>
-            <input type="email" class="form-control" id="email" placeholder="example@mail.com">
-        </div>
-        
-        <button id="sendBtn" class="btn">发送验证码</button>
-        
-        <div id="message"></div>
     </div>
 
     <script>
-        // 粒子画布设置
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({
-            antialias: true,
-            alpha: true
-        });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById('particles-js').appendChild(renderer.domElement);
-        
-        // 粒子配置
-        const particleCount = 100;
-        const particles = new THREE.Group();
-        const particleGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-        const particleMaterial = new THREE.MeshBasicMaterial({
-            color: 0x0088ff,
-            transparent: true,
-            opacity: 0.7
-        });
-        
-        // 创建粒子
-        for (let i = 0; i < particleCount; i++) {
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        document.addEventListener('DOMContentLoaded', function() {
+            // 配置后端API地址
+            const API_BASE_URL = 'https://hnqc-backend.zeabur.app';
+            const emailInput = document.getElementById('email');
+            const sendBtn = document.getElementById('sendBtn');
+            const notification = document.getElementById('notification');
             
-            // 初始位置随机
-            particle.position.set(
-                Math.random() * 200 - 100,
-                Math.random() * 200 - 100,
-                Math.random() * 200 - 100
-            );
-            
-            // 随机速度
-            particle.userData = {
-                velocity: new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.5,
-                    (Math.random() - 0.5) * 0.5,
-                    (Math.random() - 0.5) * 0.5
-                ),
-                phase: Math.random() * Math.PI * 2
-            };
-            
-            particles.add(particle);
-        }
-        
-        scene.add(particles);
-        camera.position.z = 150;
-        
-        // 动画循环
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            particles.children.forEach(particle => {
-                particle.position.add(particle.userData.velocity);
+            // 表单提交处理
+            sendBtn.addEventListener('click', function() {
+                const email = emailInput.value;
                 
-                // 边界反弹
-                if (Math.abs(particle.position.x) > 100) particle.userData.velocity.x *= -1;
-                if (Math.abs(particle.position.y) > 100) particle.userData.velocity.y *= -1;
-                if (Math.abs(particle.position.z) > 100) particle.userData.velocity.z *= -1;
+                // 清除之前的通知
+                notification.className = 'notification';
+                notification.style.display = 'none';
+                notification.textContent = '';
                 
-                // 呼吸效果
-                particle.userData.phase += 0.01;
-                particle.scale.setScalar(0.5 + Math.sin(particle.userData.phase) * 0.1);
-            });
-            
-            particles.rotation.y += 0.001;
-            
-            renderer.render(scene, camera);
-        }
-        
-        animate();
-        
-        // 窗口大小调整
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // 发送验证码
-        document.getElementById('sendBtn').addEventListener('click', function() {
-            const email = document.getElementById('email').value;
-            const messageEl = document.getElementById('message');
-            
-            // 验证邮箱格式
-            if (!validateEmail(email)) {
-                messageEl.textContent = '邮箱格式不正确，请重新输入';
-                return;
-            }
-            
-            // 禁用按钮
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = '发送中...';
-            messageEl.textContent = '';
-            
-            // 发送请求
-            fetch('/send-verification', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email: email })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    messageEl.textContent = '验证码已发送，请查收邮箱';
-                    messageEl.style.color = '#00cc66';
-                } else {
-                    messageEl.textContent = '发送失败: ' + data.error;
-                    messageEl.style.color = '#ff5555';
+                // 简单的邮箱验证
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                
+                if (!emailRegex.test(email)) {
+                    notification.className = 'notification error';
+                    notification.textContent = '请输入有效的电子邮箱地址';
+                    notification.style.display = 'block';
+                    return;
                 }
-            })
-            .catch(error => {
-                messageEl.textContent = '请求失败: ' + error;
-                messageEl.style.color = '#ff5555';
-            })
-            .finally(() => {
-                btn.disabled = false;
-                btn.textContent = '发送验证码';
+                
+                // 禁用发送按钮
+                const btn = this;
+                const originalText = btn.textContent;
+                btn.disabled = true;
+                btn.textContent = '发送中...';
+                
+                // 发送验证码请求
+                fetch(`${API_BASE_URL}/send-verification`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: email })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        notification.className = 'notification success';
+                        notification.textContent = `验证码已发送至 ${email}`;
+                    } else {
+                        notification.className = 'notification error';
+                        notification.textContent = data.message || '发送失败，请重试';
+                    }
+                    notification.style.display = 'block';
+                })
+                .catch(error => {
+                    notification.className = 'notification error';
+                    notification.textContent = '网络错误，请重试';
+                    notification.style.display = 'block';
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
             });
         });
-        
-        function validateEmail(email) {
-            const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-            return re.test(email);
-        }
     </script>
 </body>
 </html>
