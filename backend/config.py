@@ -1,17 +1,18 @@
-SENDCLOUD_API_USER = 'HNQC2025'
-SENDCLOUD_API_KEY = '09ea3daff4c5698556dfa85bc7471892'
-FROM_DOMAIN = 'hnqc.dpdns.org'
-FROM_EMAIL = 'rbx-hnqc@outlook.com'
+import os
+
+SENDCLOUD_API_USER = os.environ.get('SENDCLOUD_API_USER', 'HNQC2025')
+SENDCLOUD_API_KEY = os.environ.get('SENDCLOUD_API_KEY', '09ea3daff4c5698556dfa85bc7471892')
+FROM_DOMAIN = os.environ.get('SENDCLOUD_FROM_DOMAIN', 'hnqc.dpdns.org')
+FROM_EMAIL = os.environ.get('SENDCLOUD_FROM', 'rbx-hnqc@outlook.com')
 
 # 数据库配置
 DB_CONFIG = {
-    'host': 'sjc1.clusters.zeabur.com',
-    'user': 'mysql',
-    'password': '63EN4QU5r8euX1Ot0KziH9x2Mpf7ATlY',
-    'database': 'zeabur'
+    'host': os.environ.get('DB_HOST', 'mysql'),
+    'user': os.environ.get('DB_USER', 'root'),  # 这里建议用 root，除非你目标数据库用户名确实是 mysql
+    'password': os.environ.get('DB_PASSWORD', ''),
+    'database': os.environ.get('DB_NAME', 'zeabur')
 }
 
-# 邮件模板
 EMAIL_TEMPLATE = """
 <html>
 <body style="font-family: Arial, sans-serif; background-color: #0a0a15; color: #e0e0ff; padding: 20px;">
