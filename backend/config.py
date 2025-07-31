@@ -27,4 +27,3 @@ EMAIL_TEMPLATE = """
 </body>
 </html>
 """
-```
